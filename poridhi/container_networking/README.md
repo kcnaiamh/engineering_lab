@@ -50,3 +50,8 @@ Here is the tcpdump log captured after executing the test command for the first 
 07:16:57.115025 br1   Out IP 1.1.1.1 > 10.10.2.2: ICMP echo reply, id 6687, seq 1, length 64
 07:16:57.115027 veth-ns2-br Out IP 1.1.1.1 > 10.10.2.2: ICMP echo reply, id 6687, seq 1, length 64
 ```
+
+> I've also implemented bash script named `script.sh` to do the same task.
+
+## Live Demo
+[![asciicast](https://asciinema.org/a/rPNKZCDxuhF0EQTlsVpjYfd5H.svg)](https://asciinema.org/a/rPNKZCDxuhF0EQTlsVpjYfd5H)

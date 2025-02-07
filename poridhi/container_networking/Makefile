@@ -1,3 +1,6 @@
+# Author: Naimul Islam
+# Date: 7 February, 2025
+
 # Network Namespaces
 NS1 = ns1
 NS2 = ns2
@@ -39,7 +42,7 @@ RESET=\033[0m
 build:
 	@if [ "$$(id -u)" -ne 0 ]; then echo "$(RED)Error$(RESET): $(CYAN)This must be run as root!$(RESET)"; exit 1; fi
 
-	@echo "\n$(BLUE)[+]$(RESET) $(GREEN)Creating network namespaces...$(RESET)"
+	@echo "$(BLUE)[+]$(RESET) $(GREEN)Creating network namespaces...$(RESET)"
 	ip netns add $(NS1)
 	ip netns add $(NS2)
 	ip netns add $(ROUTER_NS)
@@ -104,7 +107,7 @@ build:
 clean:
 	@if [ "$$(id -u)" -ne 0 ]; then echo "$(RED)Error$(RESET): $(CYAN)This must be run as root!$(RESET)"; exit 1; fi
 
-	@echo "\n$(BLUE)[+]$(RESET) $(GREEN)Cleaning up the setup...$(RESET)"
+	@echo "$(BLUE)[+]$(RESET) $(GREEN)Cleaning up the setup...$(RESET)"
 	ip netns del $(NS1) || true
 	ip netns del $(NS2) || true
 	ip netns del $(ROUTER_NS) || true
@@ -112,10 +115,12 @@ clean:
 	ip link del $(BRIDGE1) || true
 
 	sysctl -w net.ipv4.ip_forward=0
-	iptables -t nat -D POSTROUTING $$(expr $$(iptables -t nat -L POSTROUTING | wc -l) - 2) || true
+	# iptables -t nat -D POSTROUTING $$(expr $$(iptables -t nat -L POSTROUTING | wc -l) - 2) || true
+	iptables -t nat -D POSTROUTING -s $(NAT_RANGE) -j MASQUERADE || true
 
 test:
 	@if [ "$$(id -u)" -ne 0 ]; then echo "$(RED)Error$(RESET): $(CYAN)This must be run as root!$(RESET)"; exit 1; fi
+	@echo "$(BLUE)[+]$(RESET) $(GREEN)Running connectivity tests...$(RESET)"
 
 	@echo "\n$(BLUE)[+]$(RESET) $(GREEN)Ping from $(NS1) network namespace to $(TARGET2)...$(RESET)"
 	ip netns exec $(NS1) ping $(TARGET2) -c 1 | grep time | head -1

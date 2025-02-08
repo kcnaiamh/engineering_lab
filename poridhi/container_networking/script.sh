@@ -10,6 +10,10 @@ BLUE='\e[34m'
 CYAN='\e[36m'
 RESET='\e[0m'
 
+function cprint() {
+    echo -e "${BLUE}[+]${RESET} ${GREEN}$1${RESET}"
+}
+
 # Ensure script is run as root
 [[ $EUID -ne 0 ]] && { echo -e "${RED}Error${RESET}: ${CYAN}This must be run as root!${RESET}"; exit 1; }
 
@@ -49,17 +53,17 @@ veth_pairs=(
 )
 
 build() {
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Creating network namespaces...${RESET}"
+    cprint "Creating network namespaces..."
     for ns in "${namespaces[@]}"; do
         ip netns add "${ns}"
     done
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Creating network bridges...${RESET}"
+    cprint "Creating network bridges..."
     for br in "${bridges[@]}"; do
         ip link add "${br}" type bridge
     done
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Setting up veth interfaces and attaching them to bridges...${RESET}"
+    cprint "Setting up veth interfaces and attaching them to bridges..."
     for entry in "${veth_pairs[@]}"; do
         read -r ns veth br <<< "${entry}"
         # Create a veth pair: one end in the namespace, one attached to the bridge
@@ -67,7 +71,7 @@ build() {
         ip link set "${veth}-br" master "${br}"
     done
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Assigning IP addresses...${RESET}"
+    cprint "Assigning IP addresses..."
     # Assign IPs inside namespaces
     ip netns exec ns1 ip addr add "${ns_cidrs[ns1]}" dev veth-ns1
     ip netns exec ns2 ip addr add "${ns_cidrs[ns2]}" dev veth-ns2
@@ -79,31 +83,31 @@ build() {
         ip addr add "${bridge_cidrs[${br}]}" dev "${br}"
     done
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Bringing up veth interfaces...${RESET}"
+    cprint "Bringing up veth interfaces..."
     for entry in "${veth_pairs[@]}"; do
         read -r ns veth br <<< "${entry}"
         ip netns exec "${ns}" ip link set "${veth}" up
         ip link set "${veth}-br" up
     done
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Bringing up bridges...${RESET}"
+    cprint "Bringing up bridges..."
     for br in "${bridges[@]}"; do
         ip link set "${br}" up
     done
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Setting up routes...${RESET}"
+    cprint "Setting up routes..."
     ip netns exec ns1 ip route add default via "$(get_ip "${bridge_cidrs[br0]}")"
     ip netns exec ns2 ip route add default via "$(get_ip "${bridge_cidrs[br1]}")"
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Enabling IP forwarding and setting up NAT...${RESET}"
+    cprint "Enabling IP forwarding and setting up NAT..."
     sysctl -w net.ipv4.ip_forward=1 1>/dev/null
     iptables -t nat -A POSTROUTING -s "$NAT_RANGE" -j MASQUERADE
 
-    echo -e "${BLUE}[+]${RESET} ${GREEN}BUILD COMPLETE.${RESET}"
+    cprint "BUILD COMPLETE."
 }
 
 clean() {
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Cleaning up the setup...${RESET}"
+    cprint "Cleaning up the setup..."
     for ns in "${namespaces[@]}"; do
         ip netns del "${ns}" 2>/dev/null
     done
@@ -112,11 +116,11 @@ clean() {
     done
     sysctl -w net.ipv4.ip_forward=0 1>/dev/null
     iptables -t nat -D POSTROUTING -s "${NAT_RANGE}" -j MASQUERADE
-    echo -e "${BLUE}[+]${RESET} ${GREEN}CLEANED.${RESET}"
+    cprint "CLEANED."
 }
 
 test_net() {
-    echo -e "${BLUE}[+]${RESET} ${GREEN}Running connectivity tests...${RESET}"
+    cprint "Running connectivity tests..."
     # Define tests as: "namespace target_ip"
     tests=(
         "ns1 ${TARGET2}"
@@ -126,7 +130,7 @@ test_net() {
     )
     for t in "${tests[@]}"; do
         read -r ns target <<< "${t}"
-        echo -e "\n${BLUE}[+]${RESET} ${GREEN}Ping from ${ns} to ${target}...${RESET}"
+        echo -e "\nPing from ${ns} to ${target}...${RESET}"
         ip netns exec "${ns}" ping "${target}" -c 1 | grep time | head -1
     done
 }

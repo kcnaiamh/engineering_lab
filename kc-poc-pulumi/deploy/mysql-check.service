@@ -1,0 +1,12 @@
+[Unit]
+Description=MySQL Availability Check
+After=network.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/environment
+ExecStart=/usr/local/bin/check-mysql.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

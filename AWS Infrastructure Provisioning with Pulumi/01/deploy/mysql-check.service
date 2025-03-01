@@ -1,0 +1,16 @@
+; This service unit file defines a simple service that runs a Bash script (check-mysql.sh) to check the availability of a MySQL server.
+; It runs once after the network is up, loads environment variables, and remains in an "active" state after completion.
+; It is configured to start during the normal system boot process.
+
+[Unit]
+Description=MySQL Availability Check
+After=network.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/environment
+ExecStart=/usr/local/bin/check-mysql.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

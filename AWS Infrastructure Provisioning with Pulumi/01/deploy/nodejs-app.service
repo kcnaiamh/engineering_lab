@@ -1,0 +1,21 @@
+; This service creates hard dependency using 'Requires' paramter. The service will stop if 'mysql-check.service' gets stop.
+; It will run the application as 'nodejs' user, which is create before with no login shell
+; In case of application crash, systemd will wait for 10 seconds and then try to restart.
+
+[Unit]
+Description=Node.js Application
+After=mysql-check.service
+Requires=mysql-check.service
+
+[Service]
+Type=simple
+User=nodejs
+WorkingDirectory=/opt/app
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

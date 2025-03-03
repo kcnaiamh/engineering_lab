@@ -1,6 +1,5 @@
-Efficient AWS Infrastructure Provisioning with Pulumi: Deploying Node.js Application with systemd Service Chaining and MySQL Health Check
+Efficient AWS Infrastructure Provisioning with Pulumi: Automate Node.js Application Deployment with Systemd Service Chaining and MySQL Healthcheck
 ---
-
 Lets spin up a fresh Linux VM and run the following command to make the environment ready.
 
 ```
@@ -60,7 +59,6 @@ pulumi new
 Now select `aws-python` template
 
 ---
-
 Create an AWS Key Pair
 
 ```shell
@@ -72,23 +70,9 @@ chmod 400 db-cluster.id_rsa
 This will save the private key as `db-cluster.id_rsa` in the `~/.ssh/` directory and restrict its permissions.
 
 ---
+Write your infrastructure provisioning code in `__main__.py` file.
 
-Write your infrastructure provisioning code in `__main__.py` file. The code is in `pulumi_aws_nodejs_db.py` file.
-
-
-
-As we have used request module, we need to install it.
-
-```
-pip install requests
-```
-
-```
-pip freeze > requirements.txt
-```
-
-
-Now privision the infrastructure
+Now provision the infrastructure
 ```
 pulumi up --yes
 ```
@@ -106,125 +90,12 @@ Change the hostname of the DB server to `db-server` to make it easier to ident
 sudo hostnamectl set-hostname db-server
 ```
 
-```
-sudo apt update
-sudo apt install mysql-server
-```
-
-Configure MySQL to allow remote connections
-
-```
-sudo vim /etc/mysql/mysql.conf.d/mysqld.cnf
-```
-
-Find the line `bind-address = 127.0.0.1` and change it to:
-
-```
-bind-address = 0.0.0.0
-```
-
-```
-sudo mysql
-```
-
-We need to create a database and user for the application.
-
-```sql
-CREATE DATABASE app_db;
-CREATE USER 'app_user'@'%' IDENTIFIED BY 'your_secure_password';
-GRANT ALL PRIVILEGES ON app_db.* TO 'app_user'@'%';
-FLUSH PRIVILEGES;
-exit;
-```
-
-```
-sudo systemctl restart mysql
-sudo systemctl status mysql
-```
-
 ---
-```
-ssh nodejs-server
-```
-
-We need to create a directory for the application and set up a no shell user for the application.
-
-```
-sudo mkdir -p /opt/app
-sudo useradd -r -s /bin/false nodejs
-sudo chown nodejs:nodejs /opt/app
-```
-
-We need to create the Node.js application.
-
-```
-cd /opt/app
-sudo wget https://raw.githubusercontent.com/kcnaiamh/devops_homelab/refs/heads/dev/kc-poc-pulumi/src/app.js -O server.js
-sudo vim server.js
-```
-
-Replace `<PRIVATE IP OF DB SERVER>` with your DB server's private IP and `your_secure_password` with the password you created in the previous step.
-
-We need to initialize npm and install the dependencies.
-
-```
-sudo apt install npm
-cd /opt/app
-sudo npm init -y
-sudo npm install express mysql2
-```
-
-Make sure to change the owner of the directory to the nodejs user.
-
-```
-sudo chown -R nodejs:nodejs /opt/app
-```
-
----
-
-Create a systemd service for the MySQL check script
-
-```
-sudo wget https://raw.githubusercontent.com/kcnaiamh/devops_homelab/refs/heads/dev/kc-poc-pulumi/deploy/mysql-check.service -O /etc/systemd/system/mysql-check.service
-```
-
-We need to reload and restart the systemd services. First reload the daemon and then stop and start the services.
-
-```
-sudo systemctl daemon-reload
-sudo systemctl start mysql-check
-```
-
-Let's see the logs
-
-```
-sudo journalctl -u mysql-check -f
-```
-
-We can see that the MySQL check script is running and the MySQL is up and running.
-
----
-
-We need to create a systemd service for the Node.js application.
-
-```
-sudo  wget https://raw.githubusercontent.com/kcnaiamh/devops_homelab/refs/heads/dev/kc-poc-pulumi/deploy/nodejs-app.service -O /etc/systemd/system/nodejs-app.service
-```
-
-Now, let's start the Node.js application:
-
-```
-sudo systemctl start nodejs-app
-sudo systemctl enable nodejs-app
-sudo systemctl status nodejs-app
-```
-
-We can see that the Node.js application is running on port 3000. We can access it using the public IP of the Node.js server.
+We can see that the Node.js application is running on port 3000. We can access it from anywhere using the public IP of the Node.js server.
 
 ```
 curl http://<PUBLIC IP>:3000
 ```
-
 
 ---
 Destroy all resources
@@ -242,11 +113,9 @@ pulumi stack rm
 **Problem With This Design**
 
 1. Only checks if MySQL is up and running before starting NodeJS application. Not when application is running.
-   So, if MySQL crashes or if not unreachable, NodeJS application will have no clue. So does a devops, as there is
-   no monitoring for healthcheck and logging.
+   So, if MySQL crashes or if not unreachable, NodeJS application will not work properly.
 2. MySQL availability is checked from NodeJS EC2 by probing to MySQL default port.
    If the default port required to changed in future 'check-mysql.sh' file need to be updated in NodeJS EC2.
    In case of firewall block the connection, NodeJS application will not start.
 3. For each Application server which depends on MySQL will need to have 'check-mysql.sh' file.
-4. No cerntralized monitoring for healthcheck data of all the services.
-5. Private IP address of MySQL need to be set manually in NodeJS application.
+4. No centralized monitoring for healthcheck data of all the services.

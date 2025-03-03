@@ -10,12 +10,13 @@ Requires=mysql-check.service
 [Service]
 Type=simple
 User=nodejs
+EnvironmentFile=/etc/environment
 WorkingDirectory=/opt/app
-ExecStart=/usr/bin/node server.js
+ExecStart=/usr/bin/node app.js
 Restart=always
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
+User=root
+Group=root
 
 [Install]
 WantedBy=multi-user.target

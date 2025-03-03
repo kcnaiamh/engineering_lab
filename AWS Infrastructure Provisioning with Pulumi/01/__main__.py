@@ -1,28 +1,10 @@
 import pulumi
 import pulumi_aws as aws
 import os
-import requests
-import sys
 
-def download_file_as_string(url: str) -> str:
-    """
-    TODO: I'm quiting the execution if the code can not be download.
-    In future I need need a fallback logic to continue execution in this case.
-    """
-    try:
-        print(f"Downloading file from {url}...")
-        response = requests.get(url=url, timeout=10)
-
-        if response.status_code == 200:
-            return response.text
-
-        print(f"Failed to download. HTTP Status Code: {response.status_code}")
-        sys.exit(1)
-
-    except requests.exceptions.RequestException as e:
-        print(f"Failed to download the file: {e}")
-        sys.exit(1)
-
+def read_file(file_path: str) -> str:
+    with open(f'./{file_path}', 'r') as fd:
+        return fd.read()
 
 vpc = aws.ec2.Vpc(
     resource_name='nodejs-db-vpc',
@@ -179,6 +161,29 @@ db_security_group = aws.ec2.SecurityGroup(
     }
 )
 
+
+
+
+mysql_setup_script = read_file('scripts/mysql-setup.sh')
+
+def generate_mysql_user_data():
+    return f'''\
+#!/usr/bin/env bash
+exec > >(tee /var/log/mysql-user-data.log) 2>&1
+
+apt update
+
+mkdir -p /usr/local/bin
+
+cat > /usr/local/bin/mysql-setup.sh << 'EOF'
+{mysql_setup_script}
+EOF
+
+chmod +x /usr/local/bin/mysql-setup.sh
+
+/usr/local/bin/mysql-setup.sh
+'''
+
 db = aws.ec2.Instance(
     resource_name = 'db-server',
     instance_type = 't2.micro',
@@ -188,20 +193,66 @@ db = aws.ec2.Instance(
     vpc_security_group_ids=[
         db_security_group.id
     ],
+    user_data=generate_mysql_user_data(),
+    user_data_replace_on_change=True,
     tags = {
         'Name': 'db-server'
-    }
+    },
+    opts=pulumi.ResourceOptions(
+        depends_on=[
+            nat_gateway,
+            private_route_table_association,
+            private_subnet
+        ]
+    )
 )
 
+nodejs_app_code = read_file('src/app.js')
+nodejs_setup_script = read_file('scripts/nodejs-setup.sh')
+mysql_check_script = read_file('scripts/mysql-check.sh')
+mysql_check_service = read_file('scripts/mysql-check.service')
+nodejs_app_service = read_file('scripts/nodejs-app.service')
 
-mysql_check_script = download_file_as_string("https://raw.githubusercontent.com/kcnaiamh/devops_homelab/refs/heads/dev/kc-poc-pulumi/deploy/check-mysql.sh")
 
-
-# will write check-mysql.sh file in the nodejs ec2
 def generate_nodejs_user_data(db_private_ip):
-    return download_file_as_string(
-        "https://raw.githubusercontent.com/kcnaiamh/devops_homelab/refs/heads/dev/kc-poc-pulumi/deploy/nodejs-user-data.sh"
-    ).format(db_private_ip=db_private_ip, mysql_check_script=mysql_check_script)
+    return f'''\
+#!/usr/bin/env bash
+exec > >(tee /var/log/nodejs-user-data.log) 2>&1
+
+apt update
+
+echo "DB_PRIVATE_IP={db_private_ip}" >> /etc/environment
+source /etc/environment
+
+mkdir -p /usr/local/bin
+mkdir -p /opt/app
+
+cat > /usr/local/bin/nodejs-setup.sh << 'EOF'
+{nodejs_setup_script}
+EOF
+
+cat > /usr/local/bin/mysql-check.sh << 'EOF'
+{mysql_check_script}
+EOF
+
+cat > /etc/systemd/system/mysql-check.service << 'EOF'
+{mysql_check_service}
+EOF
+
+cat > /etc/systemd/system/nodejs-app.service << 'EOF'
+{nodejs_app_service}
+EOF
+
+cat > /opt/app/app.js << 'EOF'
+{nodejs_app_code}
+EOF
+
+chmod +x /usr/local/bin/nodejs-setup.sh
+chmod +x /usr/local/bin/mysql-check.sh
+
+/usr/local/bin/nodejs-setup.sh
+'''
+
 
 nodejs = aws.ec2.Instance(
     resource_name='nodejs-server',

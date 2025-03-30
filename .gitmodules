@@ -1,0 +1,3 @@
+[submodule "pulumi_bash_aws_provisioning"]
+	path = pulumi_bash_aws_provisioning
+	url = https://github.com/kcnaiamh/pulumi_bash_aws_provisioning

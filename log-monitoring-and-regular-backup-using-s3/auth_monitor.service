@@ -1,0 +1,13 @@
+[Unit]
+Description=SSH Authentication Failure Monitor
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/monitor_auth.sh
+Restart=always
+RestartSec=10
+User=naim
+Group=naim
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=CPU Usage Threshold Monitor
+
+[Service]
+ExecStart=/usr/local/bin/monitor_cpu_usage.sh
+Restart=always
+RestartSec=10
+User=naim
+Group=naim
+
+[Install]
+WantedBy=multi-user.target
